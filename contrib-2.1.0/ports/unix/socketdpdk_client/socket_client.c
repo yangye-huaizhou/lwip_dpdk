@@ -48,11 +48,6 @@ static ip_addr_t ipaddr, netmask, gw;
 /* nonstatic debug cmd option, exported in lwipopts.h */
 unsigned char debug_flags;
 
-struct arg_pass {
-	int coreid;
-	void * args;
-};
-
 
 static void
 tcpip_init_done(void *arg)
@@ -122,13 +117,10 @@ main_thread(void *arg)
   tcpip_init(tcpip_init_done, &sem);
   sys_sem_wait(&sem);
   printf("TCP/IP initialized.\n");
-  struct arg_pass tmparg;
-  tmparg.coreid = 2;
-  tmparg.args = NULL;
 
 #if LWIP_RAW
   /** @todo remove dependency on RAW PCB support */
-  sys_thread_new("tcp_client", tcp_client_thread, &tmparg, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
+  sys_thread_new("tcp_client", tcp_client_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
 #endif
 
   printf("Applications started.\n");
@@ -182,11 +174,8 @@ main(int argc, char **argv)
   perf_init("/tmp/tcp_proxy.perf");
 #endif /* PERF */
 
-  struct arg_pass tmparg;
-  tmparg.coreid = 3;
-  tmparg.args = NULL;
   printf("System initialized.\n");
-  sys_thread_new("main_thread", main_thread, &tmparg, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
+  sys_thread_new("main_thread", main_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
   pause();
   return 0;
 }

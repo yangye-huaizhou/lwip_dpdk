@@ -5,8 +5,8 @@ project(socket_client C)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LWIP_CONTRIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-set(LWIP_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../lwip)
-set(RTE_SDK          /home/yangye/vhost-user/dpdk-stable-17.11.9)
+set(LWIP_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../lwip-2.1.2)
+set(RTE_SDK          ${CMAKE_CURRENT_SOURCE_DIR}/../../../../dpdk-stable-17.11.9)
 set(RTE_TARGET       x86_64-native-linuxapp-gcc)
 
 include(${LWIP_CONTRIB_DIR}/ports/CMakeCommon.cmake)

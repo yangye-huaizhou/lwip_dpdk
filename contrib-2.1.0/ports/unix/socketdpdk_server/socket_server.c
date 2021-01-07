@@ -42,11 +42,6 @@
 #define IP_ADDR "172.168.0.1"
 
 
-struct arg_pass {
-	int coreid;
-	void * args;
-};
-
 
 /* (manual) host IP configuration */
 static ip_addr_t ipaddr, netmask, gw;
@@ -153,13 +148,10 @@ main_thread(void *arg)
   sys_sem_wait(&sem);
   printf("TCP/IP initialized.\n");
 
-  struct arg_pass tmparg;
-  tmparg.coreid = 2;
-  tmparg.args = NULL;
 
 #if LWIP_RAW
   /** @todo remove dependency on RAW PCB support */
-  sys_thread_new("tcp_server", tcp_server_thread, &tmparg, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
+  sys_thread_new("tcp_server", tcp_server_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
 #endif
 
   printf("Applications started.\n");
@@ -216,12 +208,9 @@ main(int argc, char **argv)
   perf_init("/tmp/tcp_proxy.perf");
 #endif /* PERF */
 
-  struct arg_pass tmparg;
-  tmparg.coreid = 3;
-  tmparg.args = NULL;
 
   printf("System initialized.\n");  
-  sys_thread_new("main_thread", main_thread, &tmparg, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
+  sys_thread_new("main_thread", main_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
   pause();
   return 0;
 }

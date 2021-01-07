@@ -121,10 +121,8 @@ static void dpdk_input(struct rte_mbuf* m, struct netif* netif) {
 	    rte_pktmbuf_free(m);
 	}
 	else {
-		//pbuf_free(p); /*memp uses an array with varying size interval inside the array to allocate memory (this array is in heap), seems to just reset the index so that the array can be written over*/
 		rte_pktmbuf_free(m); 
 		LWIP_DEBUGF(NETIF_DEBUG, ("dpdk_input: packet drop, pbuf allocation failed.\n")); 
-		//printf("Packet Dropped\n");
 	}
 
 }
@@ -158,45 +156,26 @@ static err_t dpdk_output(struct netif *netif, struct pbuf *p) {
     if (sent)
 		port_statistics.tx += sent;
 
-//	pbuf_free(p);
 	return ERR_OK;
 }
 
-static void dpdk_rx_thread(void *arg) {
-	prctl(PR_SET_NAME,"dpdk rx thread");
-	//unsigned lcore_id = rte_lcore_id();
-	RTE_LOG(INFO, L2FWD, "dpdk_rx_thread entering main loop\n");
-
-	unsigned i, nb_rx;
+static void dpdk_thread(void *arg) {
+	prctl(PR_SET_NAME,"dpdk_thread");
+	RTE_LOG(INFO, L2FWD, "dpdk_thread entering main loop\n");
+	unsigned i, nb_rx, sent;
 	struct rte_mbuf *pkts_burst[MAX_PKT_BURST];
 	struct netif* netif = (struct netif *) arg;
 
 	while (1) {
+		sent = rte_eth_tx_buffer_flush(0, 0, l2fwd_tx_buffer);
+		port_statistics.tx += sent;
 		nb_rx = rte_eth_rx_burst(0, 0,
 					pkts_burst, MAX_PKT_BURST);
 		port_statistics.rx += nb_rx;
 
-		//port_statistics[portid].rx += nb_rx;
-
 		for (i = 0; i < nb_rx; i++) {
 			dpdk_input(pkts_burst[i], netif); 
 		}
-	}
-	
-
-}
-
-static void dpdk_tx_thread(void *arg) {
-	LWIP_UNUSED_ARG(arg);
-	prctl(PR_SET_NAME,"dpdk tx thread");
-	//unsigned lcore_id = rte_lcore_id();
-	RTE_LOG(INFO, L2FWD, "dpdk_tx_thread entering main loop\n");
-	int sent;
-
-	while (1) {
-		sent = rte_eth_tx_buffer_flush(0, 0, l2fwd_tx_buffer);
-	    if (sent)
-		port_statistics.tx += sent;
 	}
 }
 
@@ -204,16 +183,7 @@ static void dpdk_tx_thread(void *arg) {
 
 
 err_t dpdk_device_init(struct netif* netif) {
-	//struct lcore_queue_conf *qconf;
-	//unsigned lcore_id = rte_lcore_id();
-	//qconf = &lcore_queue_conf[lcore_id];
-	//struct lcore_conf *qconf;
-	//unsigned lcoreid = rte_lcore_id();
-	//qconf = &lcore_conf[lcoreid-START_CORE];
-	//if (!qconf) {
-	//	return ERR_MEM;
-	//}
-	//netif->state = &lcore_queue_conf[0];
+
 	netif->name[0] = 'd';
 	netif->name[1] = 'k';
 	netif->output = etharp_output; /*this might need to change since we statically coded the ip-ether addr pairing */
@@ -234,18 +204,11 @@ err_t dpdk_device_init(struct netif* netif) {
 	netif_set_link_up(netif);
 	//rte_eal_mp_remote_launch(dpdk_thread, (int *)netif, CALL_MASTER);
 
-	struct arg_pass tmparg1;
-    tmparg1.coreid = 1;
-    tmparg1.args = (void *)netif;
+	struct arg_pass tmparg;
+    tmparg.coreid = 1;
+    tmparg.args = (void *)netif;
     
- 	struct arg_pass tmparg2;
-    tmparg2.coreid = 4;
-    tmparg2.args = (void *)netif;
-    
-    sys_thread_new("dpdk-rx-thread", dpdk_rx_thread, &tmparg1, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
-
-	sys_thread_new("dpdk-tx-thread", dpdk_tx_thread, &tmparg2, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
-	
+    sys_thread_new("dpdk-thread", dpdk_thread, &tmparg, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
 	
 	return ERR_OK;
 	
@@ -309,7 +272,7 @@ init_dpdk(int argc, char **argv)
 	struct rte_eth_dev_info dev_info;
 	int ret;
 	uint16_t nb_ports;
-	unsigned rx_lcore_id;
+	//unsigned rx_lcore_id;
 
 	/* init EAL */
 	ret = rte_eal_init(argc, argv);
@@ -333,15 +296,13 @@ init_dpdk(int argc, char **argv)
 	 */
 	rte_eth_dev_info_get(0, &dev_info);
 
-	rx_lcore_id = 0;
+	//rx_lcore_id = 0;
 
 	/* Initialize the port/queue configuration of each logical core */
-	while (rte_lcore_is_enabled(rx_lcore_id) == 0) {
-		rx_lcore_id++;
-	}
-	printf("Lcore %u: RX port 0\n", rx_lcore_id);
-
-	//nb_ports_available = nb_ports;
+	//while (rte_lcore_is_enabled(rx_lcore_id) == 0) {
+	//	rx_lcore_id++;
+	//}
+	printf("lcore 1: RX port 0 \n");
 
 	/* init port 0 */
 	printf("Initializing port 0 ... \n");
@@ -411,25 +372,6 @@ init_dpdk(int argc, char **argv)
 	check_port_link_status();
 
 	ret = 0;
-	/* launch per-lcore init on every lcore */
-//	rte_eal_mp_remote_launch(l2fwd_launch_one_lcore, NULL, CALL_MASTER);
-	//RTE_LCORE_FOREACH_SLAVE(lcore_id) {
-	//	if (rte_eal_wait_lcore(lcore_id) < 0) {
-	//		ret = -1;
-	//		break;
-	//	}
-	//}
-/*
-	for (portid = 0; portid < nb_ports; portid++) {
-		if ((l2fwd_enabled_port_mask & (1 << portid)) == 0)
-			continue;
-		printf("Closing port %d...", portid);
-		rte_eth_dev_stop(portid);
-		rte_eth_dev_close(portid);
-		printf(" Done\n");
-	}
-	printf("Bye...\n");
-*/
 	return ret;
 }
 
