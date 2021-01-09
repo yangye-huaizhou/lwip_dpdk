@@ -7,7 +7,7 @@ We made **no** modification to DPDK and lwip, but only modify the ```netif``` de
 
 We also wrote a socket application in ```/ports/unix/socketdpdk_client&server```. So you can just follow the logical in ```/ports/unix/socketdpdk_server&client/dpdk.c``` to write your own applications.
 
-Currently, we bind the dpdk worker thread to logical core 2. Other threads, like "tcpipthread", are not pinned to any specifical core.
+Currently, we bind the dpdk worker thread to logical core 1. Other threads, like "tcpipthread", are not pinned to any specifical core.
 
 
 ### Usage
@@ -49,7 +49,7 @@ make
 After that, use command to run:
 
 ```
-./socket_server -c 2
+./socket_server
 ```
 
 Also, it takes the same procedures to compile and run the client in ```/ports/unix/socketdpdk_client/```.

@@ -275,11 +275,17 @@ init_dpdk(int argc, char **argv)
 	//unsigned rx_lcore_id;
 
 	/* init EAL */
-	ret = rte_eal_init(argc, argv);
+	int val = 3;
+	char *str[3];
+	str[0] = argv[0];
+	char tmpstr1[] = "-c";
+	str[1] = tmpstr1;
+	char tmpstr2[] = "2";
+	str[2] = tmpstr2;
+	
+	ret = rte_eal_init(val, str);
 	if (ret < 0)
 		rte_exit(EXIT_FAILURE, "Invalid EAL arguments\n");
-	argc -= ret;
-	argv += ret;
 
 	/* create the mbuf pool */
 	l2fwd_pktmbuf_pool = rte_pktmbuf_pool_create("mbuf_pool", NB_MBUF,
@@ -296,12 +302,6 @@ init_dpdk(int argc, char **argv)
 	 */
 	rte_eth_dev_info_get(0, &dev_info);
 
-	//rx_lcore_id = 0;
-
-	/* Initialize the port/queue configuration of each logical core */
-	//while (rte_lcore_is_enabled(rx_lcore_id) == 0) {
-	//	rx_lcore_id++;
-	//}
 	printf("lcore 1: RX port 0 \n");
 
 	/* init port 0 */
