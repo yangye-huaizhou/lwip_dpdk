@@ -29,40 +29,19 @@
  * Author: Adam Dunkels <adam@sics.se>
  *
  */
-
-#include <unistd.h>
 #include <fcntl.h>
-#include <getopt.h>
+#include <unistd.h>
+#include <sys/prctl.h>
 
-#include "lwip/sockets.h"
-#include "lwip/err.h"
-
-#include "lwip/opt.h"
-
-#include "lwip/init.h"
-
-#include "lwip/mem.h"
-#include "lwip/memp.h"
-#include "lwip/sys.h"
-
-#include "lwip/stats.h"
-
-#include "lwip/inet_chksum.h"
-
-#include "lwip/tcpip.h"
-#include "lwip/sockets.h"
-
-#include "netif/tapif.h"
-#include "netif/pcapif.h"
-
-#include "lwip/ip_addr.h"
-#include "arch/perf.h"
+	
+#include "socket_server.h"
 
 
-#if LWIP_RAW
-#include "lwip/icmp.h"
-#include "lwip/raw.h"
-#endif
+#define NETMASK "255.255.255.0"
+#define GATEWAY "172.168.0.0"
+#define IP_ADDR "172.168.0.1"
+
+
 
 /* (manual) host IP configuration */
 static ip_addr_t ipaddr, netmask, gw;
@@ -72,16 +51,13 @@ unsigned char debug_flags;
 
 static char data_buffer[100];
 
-static void init_netifs(void);
 
 static void
 tcpip_init_done(void *arg)
 {
   sys_sem_t *sem;
   sem = (sys_sem_t *)arg;
-
   init_netifs();
-
   sys_sem_signal(sem);
 }
 
@@ -91,7 +67,7 @@ tcpip_init_done(void *arg)
 
 static void tcp_server_thread(void *arg)
 {
-    LWIP_UNUSED_ARG(arg);
+  LWIP_UNUSED_ARG(arg);
 	struct sockaddr_in server_addr;
 	struct sockaddr_in conn_addr;
 	int sock_fd;				/* server socked */
@@ -137,6 +113,8 @@ static void tcp_server_thread(void *arg)
 		printf("length received %d\n", length);
 		printf("received string: %s\n", data_buffer);
 		printf("received count: %d\n", count);
+ 
+		//send(sock_conn, "good", 5, 0);
 	}
 }
 
@@ -148,8 +126,7 @@ static void
 init_netifs(void)
 {
    
-  netif_set_default(netif_add(&netif,&ipaddr, &netmask, &gw, NULL, tapif_init,
-                  tcpip_input));
+  netif_set_default(netif_add(&netif,&ipaddr, &netmask, &gw, NULL, dpdk_device_init, tcpip_input));
   netif_set_up(&netif);
 
 }
@@ -158,10 +135,11 @@ init_netifs(void)
 static void
 main_thread(void *arg)
 {
+  prctl(PR_SET_NAME,"main thread");
   sys_sem_t sem;
   LWIP_UNUSED_ARG(arg);
 
-  netif_init();
+  //netif_init();
 
   if(sys_sem_new(&sem, 0) != ERR_OK) {
     LWIP_ASSERT("Failed to create semaphore", 0);
@@ -169,6 +147,7 @@ main_thread(void *arg)
   tcpip_init(tcpip_init_done, &sem);
   sys_sem_wait(&sem);
   printf("TCP/IP initialized.\n");
+
 
 #if LWIP_RAW
   /** @todo remove dependency on RAW PCB support */
@@ -189,13 +168,29 @@ main_thread(void *arg)
 int
 main(int argc, char **argv)
 {
+  int ret = 0;
   struct in_addr inaddr;
+
+  ret = init_dpdk(argc, argv);
+  argc -= ret;
+  argv += ret;
+  if (ret < 0){
+    return 0;
+  }
+
+  inet_aton(IP_ADDR, &inaddr);
+  ipaddr.addr = inaddr.s_addr;
+  inet_aton(GATEWAY, &inaddr);
+  gw.addr = inaddr.s_addr;
+  inet_aton(NETMASK, &inaddr);
+  netmask.addr = inaddr.s_addr;
+
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
 
   /* startup defaults (may be overridden by one or more opts) */
-  IP4_ADDR(&gw, 172,168,0,1);
-  IP4_ADDR(&netmask, 255,255,255,0);
-  IP4_ADDR(&ipaddr, 172,168,0,2);
+  //IP4_ADDR(&gw, 172,168,0,1);
+  //IP4_ADDR(&netmask, 255,255,255,0);
+  //IP4_ADDR(&ipaddr, 172,168,0,2);
 
   //debug_flags |= LWIP_DBG_OFF;
   /* use debug flags defined by debug.h */
@@ -213,8 +208,8 @@ main(int argc, char **argv)
   perf_init("/tmp/tcp_proxy.perf");
 #endif /* PERF */
 
-  printf("System initialized.\n");
-    
+
+  printf("System initialized.\n");  
   sys_thread_new("main_thread", main_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
   pause();
   return 0;

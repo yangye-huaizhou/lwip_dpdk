@@ -14,17 +14,23 @@ set(lwipcontribportunix_SRCS
 )
 
 set(lwipcontribportunixnetifs_SRCS
+    ${LWIP_CONTRIB_DIR}/ports/unix/port/netif/dpdkif.c
     ${LWIP_CONTRIB_DIR}/ports/unix/port/netif/tapif.c
     ${LWIP_CONTRIB_DIR}/ports/unix/port/netif/list.c
     ${LWIP_CONTRIB_DIR}/ports/unix/port/netif/sio.c
     ${LWIP_CONTRIB_DIR}/ports/unix/port/netif/fifo.c
 )
 
+set(RTE_SDK            ${LWIP_CONTRIB_DIR}/../dpdk-stable-17.11.9)
+set(RTE_TARGET         x86_64-native-linuxapp-gcc)
+set(DPDK_INCLUDE_DIRS  "${RTE_SDK}/${RTE_TARGET}/include")
+set(DPDK_LIB_DIRS      "${RTE_SDK}/${RTE_TARGET}/lib")
+
 add_library(lwipcontribportunix EXCLUDE_FROM_ALL ${lwipcontribportunix_SRCS} ${lwipcontribportunixnetifs_SRCS})
-target_include_directories(lwipcontribportunix PRIVATE ${LWIP_INCLUDE_DIRS} ${LWIP_MBEDTLS_INCLUDE_DIRS})
+target_include_directories(lwipcontribportunix PRIVATE ${LWIP_INCLUDE_DIRS} ${LWIP_MBEDTLS_INCLUDE_DIRS} ${DPDK_INCLUDE_DIRS})
 target_compile_options(lwipcontribportunix PRIVATE ${LWIP_COMPILER_FLAGS})
 target_compile_definitions(lwipcontribportunix PRIVATE ${LWIP_DEFINITIONS} ${LWIP_MBEDTLS_DEFINITIONS})
-target_link_libraries(lwipcontribportunix PUBLIC ${LWIP_MBEDTLS_LINK_LIBRARIES})
+target_link_libraries(lwipcontribportunix PUBLIC ${LWIP_MBEDTLS_LINK_LIBRARIES} "-L${DPDK_LIB_DIRS}" "-Wl,--whole-archive" rte_mempool_octeontx rte_pci rte_kvargs rte_ethdev rte_bus_pci rte_bus_vdev rte_eal rte_mempool rte_mempool_ring rte_ring rte_mbuf rte_pmd_ixgbe rte_hash rte_net rte_pmd_virtio "-Wl,--no-whole-archive" numa dl)
 
 if (CMAKE_SYSTEM_NAME STREQUAL Linux)
     find_library(LIBUTIL util)

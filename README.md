@@ -3,16 +3,16 @@ DPDK accelerated lwip userspace protocol stack, built based on lwip-2.1.2, dpdk-
 
 ### What's the difference?
 
-We made **no** modification to DPDK and lwip, but only modify the ```netif``` device driver in contrib-2.1.0. So the lwip protocol stack can use DPDK driver to receive and send packets. That will make lwip a "real user space" protocol stack.
+We made **no** modification to DPDK and lwip, but only add a kind of ```dpdkif``` device in the directory ```contrib-2.1.0/ports/unix/port/netif/```. So the lwip protocol stack can use DPDK driver to receive and send packets. That will make lwip a "real user space" protocol stack.
 
-We also wrote a socket application in ```/ports/unix/socketdpdk_client&server```. So you can just follow the logical in ```/ports/unix/socketdpdk_server&client/dpdk.c``` to write your own applications.
+We also wrote a socket application in ```/ports/unix/socket_client```(client) and ```/ports/unix/socket_server```(server). So you can just follow the logical in this program to write your own applications.
 
-Currently, we bind the dpdk worker thread to logical core 1. Other threads, like "tcpipthread", are not pinned to any specifical core.
+Currently, we bind the dpdk worker thread to logical core 1. Other threads, like "tcpipthread", are not pinned to any specifical core. So please make sure you have at least 2 CPU cores to run this program.
 
 
 ### Usage
 
-To run the application, you first need to compile the DPDK library:
+To run the application, you first need to compile the DPDK library (here we use dpdk-stable-17.11.9 version):
 
 ```
 cd ${path_to_dpdk}
@@ -31,10 +31,10 @@ ifconfig eth3 down
 ```
 
 After every thing is finished, compile the application.
-Make a "build" directory in ```/ports/unix/socketdpdk_server/``` with command:
+Make a "build" directory in ```/ports/unix/socket_server/``` with command:
 
 ```
-cd ${path_to_socketdpdk_server}
+cd ${path_to_socket_server}
 mkdir build
 ```
 
@@ -45,12 +45,12 @@ cd build
 cmake ..
 make
 ```
-
+(If errors occured here, you may need to modify the cmake files in ```contrib-2.1.0/ports/unix/Filelists.cmake``` and ```contrib-2.1.0/ports/unix/socket_server/CMakeList.txt```)
 After that, use command to run:
 
 ```
 ./socket_server
 ```
 
-Also, it takes the same procedures to compile and run the client in ```/ports/unix/socketdpdk_client/```.
+Also, it takes the same procedures to compile and run the client in ```/ports/unix/socket_client/```.
 Do not forget to change the ip/gateway/netmask to what you want in ```socket_server.c``` and ```socket_client.c```. 

@@ -5,7 +5,7 @@ project(socket_client C)
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(LWIP_CONTRIB_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-set(LWIP_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../lwip)
+set(LWIP_DIR         ${CMAKE_CURRENT_SOURCE_DIR}/../../../../lwip-2.1.2)
 
 include(${LWIP_CONTRIB_DIR}/ports/CMakeCommon.cmake)
 

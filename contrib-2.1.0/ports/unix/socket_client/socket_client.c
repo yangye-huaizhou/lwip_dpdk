@@ -30,39 +30,17 @@
  *
  */
 
-#include <unistd.h>
 #include <fcntl.h>
-#include <getopt.h>
+#include <unistd.h>
+#include <sys/prctl.h>
 
-#include "lwip/sockets.h"
-#include "lwip/err.h"
+  
+#include "socket_client.h"
 
-#include "lwip/opt.h"
+#define NETMASK "255.255.255.0"
+#define GATEWAY "172.168.0.0"
+#define IP_ADDR "172.168.0.2"
 
-#include "lwip/init.h"
-
-#include "lwip/mem.h"
-#include "lwip/memp.h"
-#include "lwip/sys.h"
-
-#include "lwip/stats.h"
-
-#include "lwip/inet_chksum.h"
-
-#include "lwip/tcpip.h"
-#include "lwip/sockets.h"
-
-#include "netif/tapif.h"
-#include "netif/pcapif.h"
-
-#include "lwip/ip_addr.h"
-#include "arch/perf.h"
-
-
-#if LWIP_RAW
-#include "lwip/icmp.h"
-#include "lwip/raw.h"
-#endif
 
 /* (manual) host IP configuration */
 static ip_addr_t ipaddr, netmask, gw;
@@ -70,16 +48,13 @@ static ip_addr_t ipaddr, netmask, gw;
 /* nonstatic debug cmd option, exported in lwipopts.h */
 unsigned char debug_flags;
 
-static void init_netifs(void);
 
 static void
 tcpip_init_done(void *arg)
 {
   sys_sem_t *sem;
   sem = (sys_sem_t *)arg;
-
   init_netifs();
-
   sys_sem_signal(sem);
 }
 
@@ -87,7 +62,9 @@ tcpip_init_done(void *arg)
 /*-----------------------------------------------------------------------------------*/
 #if LWIP_RAW
 static void tcp_client_thread(void * arg) {
-        char msg[] = "hello, you are connected!\n";
+    prctl(PR_SET_NAME,"tcp client thread");
+    LWIP_UNUSED_ARG(arg);
+    char msg[] = "hello, you are connected!\n";
 	struct sockaddr_in server_addr;
 	int sock_fd;
 
@@ -98,7 +75,7 @@ static void tcp_client_thread(void * arg) {
 	}
     memset(&server_addr, 0, sizeof(server_addr));
 	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = inet_addr("172.168.0.2");
+	server_addr.sin_addr.s_addr = inet_addr("172.168.0.1");
 
 	server_addr.sin_port = htons(5000);
 
@@ -118,7 +95,7 @@ static void
 init_netifs(void)
 {
    
-  netif_set_default(netif_add(&netif,&ipaddr, &netmask, &gw, NULL, tapif_init,
+  netif_set_default(netif_add(&netif, &ipaddr, &netmask, &gw, NULL, dpdk_device_init,
                   tcpip_input));
   netif_set_up(&netif);
 
@@ -128,6 +105,7 @@ init_netifs(void)
 static void
 main_thread(void *arg)
 {
+  prctl(PR_SET_NAME,"main thread");
   sys_sem_t sem;
   LWIP_UNUSED_ARG(arg);
 
@@ -159,13 +137,27 @@ main_thread(void *arg)
 int
 main(int argc, char **argv)
 {
+  int ret = 0;
   struct in_addr inaddr;
+
+  ret = init_dpdk(argc, argv);
+  argc -= ret;
+  argv += ret;
+  if (ret < 0){
+    return 0;
+  }
+
+  inet_aton(IP_ADDR, &inaddr);
+  ipaddr.addr = inaddr.s_addr;
+  inet_aton(GATEWAY, &inaddr);
+  gw.addr = inaddr.s_addr;
+  inet_aton(NETMASK, &inaddr);
+  netmask.addr = inaddr.s_addr;
+
+
   char ip_str[16] = {0}, nm_str[16] = {0}, gw_str[16] = {0};
 
   /* startup defaults (may be overridden by one or more opts) */
-  IP4_ADDR(&gw, 172,169,0,1);
-  IP4_ADDR(&netmask, 255,255,255,0);
-  IP4_ADDR(&ipaddr, 172,169,0,2);
   //debug_flags |= LWIP_DBG_OFF;
   /* use debug flags defined by debug.h */
   debug_flags |= (LWIP_DBG_ON|LWIP_DBG_TRACE|LWIP_DBG_STATE|LWIP_DBG_FRESH|LWIP_DBG_HALT);
@@ -183,7 +175,6 @@ main(int argc, char **argv)
 #endif /* PERF */
 
   printf("System initialized.\n");
-    
   sys_thread_new("main_thread", main_thread, NULL, DEFAULT_THREAD_STACKSIZE, DEFAULT_THREAD_PRIO);
   pause();
   return 0;
